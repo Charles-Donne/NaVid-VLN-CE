@@ -20,63 +20,187 @@ from navid.mm_utils import tokenizer_image_token, get_model_name_from_path, Keyw
 
 
 
+# def evaluate_agent(config, split_id, dataset, model_path, result_path) -> None:
+#     # 强制限制评估的episode数量
+#     max_episodes = min(
+#         config.EVAL.MAX_EPISODE_COUNT if hasattr(config.EVAL, 'MAX_EPISODE_COUNT') else 10,
+#         config.TASK_CONFIG.DATASET.MAX_EPISODES if hasattr(config.TASK_CONFIG.DATASET, 'MAX_EPISODES') else 10,
+#         10  # 默认上限
+#     )
+    
+#     # 如果数据集太大，截断数据集
+#     if len(dataset.episodes) > max_episodes:
+#         print(f"截断数据集至 {max_episodes} 个episode (原 {len(dataset.episodes)} 个)")
+#         dataset.episodes = dataset.episodes[:max_episodes]
+
+    
+#     env = Env(config.TASK_CONFIG, dataset)
+
+#     agent = NaVid_Agent(model_path, result_path)
+
+#     num_episodes = len(env.episodes)
+#     print(f"实际评估 {num_episodes} 个episode")
+    
+#     EARLY_STOP_ROTATION = config.EVAL.EARLY_STOP_ROTATION
+#     EARLY_STOP_STEPS = config.EVAL.EARLY_STOP_STEPS
+
+#     target_key = {"distance_to_goal", "success", "spl", "path_length", "oracle_success"}
+
+#     count = 0
+    
+#     # 使用tqdm显示进度条，并设置总数为实际episode数量
+#     progress = trange(num_episodes, desc=config.EVAL.IDENTIFICATION+"-{}".format(split_id))
+    
+#     for _ in progress:
+#         # 如果已经达到最大episode数，提前结束
+#         if count >= max_episodes:
+#             print(f"已达到最大episode数 ({max_episodes})，提前结束评估")
+#             break
+            
+#         obs = env.reset()
+#         iter_step = 0
+#         agent.reset()
+
+#         continuse_rotation_count = 0
+#         last_dtg = 999
+#         while not env.episode_over:
+#             info = env.get_metrics()
+            
+#             if info["distance_to_goal"] != last_dtg:
+#                 last_dtg = info["distance_to_goal"]
+#                 continuse_rotation_count = 0
+#             else:
+#                 continuse_rotation_count += 1 
+            
+#             action = agent.act(obs, info, env.current_episode.episode_id)
+            
+#             if continuse_rotation_count > EARLY_STOP_ROTATION or iter_step > EARLY_STOP_STEPS:
+#                 action = {"action": 0}
+
+#             iter_step += 1
+#             obs = env.step(action)
+            
+#         info = env.get_metrics()
+#         result_dict = dict()
+#         result_dict = {k: info[k] for k in target_key if k in info}
+#         result_dict["id"] = env.current_episode.episode_id
+#         count += 1
+
+#         # 更新进度条描述
+#         progress.set_description(f"{config.EVAL.IDENTIFICATION}-{split_id} [ep {count}/{max_episodes}]")
+
+#         # 保存结果
+#         with open(os.path.join(os.path.join(result_path, "log"), "stats_{}.json".format(env.current_episode.episode_id)), "w") as f:
+#             json.dump(result_dict, f, indent=4)
+    
+#     print(f"评估完成! 共评估 {count} 个episode")
+          
+     
 def evaluate_agent(config, split_id, dataset, model_path, result_path) -> None:
- 
+    # 确保结果目录存在
+    os.makedirs(os.path.join(result_path, "log"), exist_ok=True)
+    os.makedirs(os.path.join(result_path, "video"), exist_ok=True)
+    
+    # 记录已评估ID的文件路径
+    eval_record = os.path.join(result_path, "evaluated.txt")
+    
+    # 读取已评估ID（处理类型转换）
+    evaluated_ids = set()
+    if os.path.exists(eval_record):
+        with open(eval_record, "r") as f:
+            # 将每行转换为字符串（去换行符）
+            evaluated_ids = {line.strip() for line in f.readlines()}
+    
+    # 打印调试信息
+    print(f"已评估ID数量: {len(evaluated_ids)}")
+    
+    # 过滤未评估episode（确保ID类型一致）
+    unevaluated = [
+        ep for ep in dataset.episodes 
+        if str(ep.episode_id) not in evaluated_ids  # 关键：统一转换为字符串比较
+    ]
+    
+    # 设置最大评估数量
+    max_episodes = min(10, len(unevaluated))
+    
+    if not unevaluated:
+        print("所有episode已完成评估！")
+        return
+    
+    # 使用未评估的episode
+    dataset.episodes = unevaluated[:max_episodes]
+    
+    # 打印即将评估的ID
+    evaluating_ids = [str(ep.episode_id) for ep in dataset.episodes]
+    print(f"即将评估的ID: {evaluating_ids}")
+    
+    # 原有环境初始化
     env = Env(config.TASK_CONFIG, dataset)
-
     agent = NaVid_Agent(model_path, result_path)
-
+    
     num_episodes = len(env.episodes)
+    print(f"实际评估 {num_episodes} 个episode")
     
     EARLY_STOP_ROTATION = config.EVAL.EARLY_STOP_ROTATION
     EARLY_STOP_STEPS = config.EVAL.EARLY_STOP_STEPS
 
-    
     target_key = {"distance_to_goal", "success", "spl", "path_length", "oracle_success"}
 
     count = 0
     
-      
-    for _ in trange(num_episodes, desc=config.EVAL.IDENTIFICATION+"-{}".format(split_id)):
+    # 使用tqdm显示进度条，并设置总数为实际episode数量
+    progress = trange(num_episodes, desc=config.EVAL.IDENTIFICATION+"-{}".format(split_id))
+    
+    for _ in progress:
+        # 如果已经达到最大episode数，提前结束
+        if count >= max_episodes:
+            print(f"已达到最大episode数 ({max_episodes})，提前结束评估")
+            break
+            
         obs = env.reset()
         iter_step = 0
         agent.reset()
 
-         
         continuse_rotation_count = 0
         last_dtg = 999
         while not env.episode_over:
-            
             info = env.get_metrics()
             
             if info["distance_to_goal"] != last_dtg:
                 last_dtg = info["distance_to_goal"]
-                continuse_rotation_count=0
-            else :
-                continuse_rotation_count +=1 
-            
+                continuse_rotation_count = 0
+            else:
+                continuse_rotation_count += 1 
             
             action = agent.act(obs, info, env.current_episode.episode_id)
             
-            if continuse_rotation_count > EARLY_STOP_ROTATION or iter_step>EARLY_STOP_STEPS:
+            if continuse_rotation_count > EARLY_STOP_ROTATION or iter_step > EARLY_STOP_STEPS:
                 action = {"action": 0}
 
-            
-            iter_step+=1
+            iter_step += 1
             obs = env.step(action)
             
         info = env.get_metrics()
         result_dict = dict()
         result_dict = {k: info[k] for k in target_key if k in info}
         result_dict["id"] = env.current_episode.episode_id
-        count+=1
+        count += 1
 
-
-
-        with open(os.path.join(os.path.join(result_path, "log"),"stats_{}.json".format(env.current_episode.episode_id)), "w") as f:
-            json.dump(result_dict, f, indent=4)
-
-
+        # 更新进度条描述
+        progress.set_description(f"{config.EVAL.IDENTIFICATION}-{split_id} [ep {count}/{max_episodes}]")
+    
+    # 评估完成后，保存已评估ID（确保不重复记录）
+    new_evaluated_ids = {str(ep.episode_id) for ep in dataset.episodes}
+    
+    # 只保存本次新评估的ID（避免重复）
+    with open(eval_record, "a") as f:
+        for ep_id in new_evaluated_ids:
+            # 检查是否已经记录过（防止重复追加）
+            if ep_id not in evaluated_ids:
+                f.write(ep_id + "\n")
+                evaluated_ids.add(ep_id)  # 更新内存中的集合
+    
+    print(f"新增评估 {len(new_evaluated_ids)} 个episode")
 
 
 class NaVid_Agent(Agent):

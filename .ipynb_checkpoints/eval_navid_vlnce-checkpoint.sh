@@ -6,9 +6,8 @@ MODEL_PATH="/root/autodl-tmp/model_zoo/navid-7b-full-224-video-fps-1-grid-2-r2r-
 
 #R2R
 CONFIG_PATH="VLN_CE/vlnce_baselines/config/r2r_baselines/navid_r2r.yaml"
-SAVE_PATH="/root/autodl-tmp/result/navid/r2r" 
+SAVE_PATH="/root/autodl-tmp/result" 
 
-mkdir -p $SAVE_PATH
 
 # #RxR
 # CONFIG_PATH="/root/navid_ws/NaVid-VLN-CE/VLN_CE/vlnce_baselines/config/rxr_baselines/navid_rxr.yaml"

@@ -5,5 +5,5 @@ EVAL:
     EARLY_STOP_ROTATION: 25
     EARLY_STOP_STEPS: 500
     # Add an early stopping criterion may accelerate evaluation. It could result in a slight performance drop.
-
-
+MODEL:
+  VISION_TOWER: /root/autodl-tmp/model_zoo/eva_vit_g.pth

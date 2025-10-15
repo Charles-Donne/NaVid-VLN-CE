@@ -1,10 +1,10 @@
 fastapi
 gradio==3.35.2
 markdown2[all]
-numpy==1.23.5
+numpy==1.21.6
 requests
 sentencepiece
-tokenizers>=0.12.1
+tokenizers==0.13.3
 torch==2.0.1
 torchvision==0.15.2
 uvicorn
@@ -19,7 +19,7 @@ einops==0.6.1
 einops-exts==0.0.4
 timm==0.6.13
 gradio_client==0.2.9
-fairscale
+fairscale==0.4.0
 decord
 absl-py
 braceexpand
