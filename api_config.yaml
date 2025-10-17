@@ -4,7 +4,7 @@
 # OpenRouter API配置
 openrouter:
   # API密钥 - 从 https://openrouter.ai/keys 获取
-  api_key: "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"
+  api_key: ""
   
   # API基础URL（通常不需要修改）
   base_url: "https://openrouter.ai/api/v1/chat/completions"
