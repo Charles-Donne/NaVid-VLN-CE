@@ -27,6 +27,9 @@ logs/
 results/
 *.log
 
+# API keys and sensitive config
+api_config.yaml
+
 # OS files
 .DS_Store
 Thumbs.db
