@@ -3,6 +3,7 @@ gradio==3.35.2
 markdown2[all]
 numpy==1.21.6
 requests
+pyyaml
 sentencepiece
 tokenizers==0.13.3
 torch==2.0.1

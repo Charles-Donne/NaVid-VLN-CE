@@ -1,0 +1,77 @@
+# OpenRouter API 配置文件
+# 用于Episode Instruction分析工具
+
+# OpenRouter API配置
+openrouter:
+  # API密钥 - 从 https://openrouter.ai/keys 获取
+  api_key: "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"
+  
+  # API基础URL（通常不需要修改）
+  base_url: "https://openrouter.ai/api/v1/chat/completions"
+  
+  # 默认使用的模型
+  default_model: "qwen/qwen-2.5-72b-instruct"
+  
+  # 请求超时时间（秒）
+  timeout: 30
+  
+  # 可选：请求重试次数
+  max_retries: 3
+
+# 模型配置
+models:
+  # 推荐的模型列表
+  qwen_72b:
+    name: "qwen/qwen-2.5-72b-instruct"
+    description: "最强性能，适合生产环境"
+    temperature: 0.7
+    max_tokens: 1000
+    
+  qwen_7b:
+    name: "qwen/qwen-2.5-7b-instruct"
+    description: "更快更便宜，适合测试和批量分析"
+    temperature: 0.7
+    max_tokens: 1000
+    
+  qwen_72b_v2:
+    name: "qwen/qwen-2-72b-instruct"
+    description: "上一代旗舰模型"
+    temperature: 0.7
+    max_tokens: 1000
+
+# 分析提示词模板配置
+analysis:
+  # 是否包含任务类型分析
+  include_task_type: true
+  
+  # 是否包含关键地标提取
+  include_landmarks: true
+  
+  # 是否包含动作序列分析
+  include_action_sequence: true
+  
+  # 是否包含空间关系分析
+  include_spatial_relations: true
+  
+  # 是否包含难度评估
+  include_difficulty: true
+  
+  # 是否包含潜在挑战分析
+  include_challenges: true
+  
+  # 输出语言
+  output_language: "中文"
+
+# 输出配置
+output:
+  # 默认输出文件名
+  default_output_file: "instruction_analysis_results.json"
+  
+  # 输出目录
+  output_dir: "analysis_results"
+  
+  # 是否自动创建带时间戳的文件名
+  use_timestamp: true
+  
+  # 日志级别 (DEBUG, INFO, WARNING, ERROR)
+  log_level: "INFO"
