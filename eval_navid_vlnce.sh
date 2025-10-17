@@ -25,11 +25,11 @@ for IDX in $(seq 0 $((CHUNKS-1))); do
     
     # 在指定GPU上运行评估任务（后台并行）
     CUDA_VISIBLE_DEVICES=$(( IDX % 8 )) python run.py \
-    --exp-config $CONFIG_PATH \      # 实验配置文件路径
-    --split-num $CHUNKS \            # 数据集总分块数
-    --split-id $IDX \                # 当前分块ID（从0开始）
-    --model-path $MODEL_PATH \       # 模型权重文件路径
-    --result-path $SAVE_PATH &       # 结果保存路径（&表示后台运行）
+    --exp-config $CONFIG_PATH \
+    --split-num $CHUNKS \
+    --split-id $IDX \
+    --model-path $MODEL_PATH \
+    --result-path $SAVE_PATH &
     
 done
 

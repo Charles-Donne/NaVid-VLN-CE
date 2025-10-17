@@ -1,0 +1,32 @@
+# Ignore Python caches
+__pycache__/
+*.py[cod]
+*.so
+
+# Jupyter notebooks checkpoints
+.ipynb_checkpoints/
+
+# IDE/editor
+.vscode/
+.idea/
+*.swp
+
+# Model weights & large artifacts
+model_zoo/*
+!model_zoo/.gitkeep
+
+# Common weight file extensions
+*.pth
+*.pt
+*.ckpt
+*.bin
+*.safetensors
+
+# Logs and results
+logs/
+results/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db

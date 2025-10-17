@@ -5,6 +5,7 @@ NaVid 智能体模块
 """
 
 import json
+from datetime import datetime
 import numpy as np
 from habitat import Env
 from habitat.core.agent import Agent
@@ -54,7 +55,7 @@ def evaluate_agent(config, split_id, dataset, model_path, result_path) -> None:
     ]
     
     # 限制单次评估数量
-    max_episodes = min(10, len(unevaluated))
+    max_episodes = min(20, len(unevaluated))
     
     if not unevaluated:
         print("所有episode已完成评估！")
@@ -165,36 +166,46 @@ def evaluate_agent(config, split_id, dataset, model_path, result_path) -> None:
     
     # 计算并保存本次评估的汇总统计
     if all_results:
-        summary_path = os.path.join(result_path, f"summary_split_{split_id}.txt")
-        with open(summary_path, "w") as f:
-            f.write("="*60 + "\n")
-            f.write(f"NaVid 评估汇总报告 - Split {split_id}\n")
-            f.write(f"评估标识: {config.EVAL.IDENTIFICATION}\n")
-            f.write(f"评估时间: {count} episodes\n")
-            f.write("="*60 + "\n\n")
-            
+        # 轮次编号：通过 index 文件确保每次递增且不会覆盖
+        index_file = os.path.join(result_path, "summary_index.txt")
+        try:
+            last_idx = int(open(index_file, "r").read().strip()) if os.path.exists(index_file) else 0
+        except Exception:
+            last_idx = 0
+        run_idx = last_idx + 1
+        with open(index_file, "w") as idx_f:
+            idx_f.write(str(run_idx))
+
+        # 汇总文件：统一写入一个 summary.txt，按轮次追加
+        summary_file = os.path.join(result_path, "summary.txt")
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with open(summary_file, "a") as f:
+            f.write("\n" + "#"*80 + "\n")
+            f.write(f"NaVid 评估汇总报告 | 第 {run_idx} 次评估 | Split {split_id} | {now_str}\n")
+            f.write("#"*80 + "\n\n")
+            f.write(f"评估标识: {getattr(getattr(config, 'EVAL', object()), 'IDENTIFICATION', 'N/A')}\n")
+            f.write(f"本轮评估episode数: {count}\n")
+            f.write("\n")
+
             # 列出所有测试的episode
             f.write("测试的Episode列表:\n")
             for i, result in enumerate(all_results, 1):
                 f.write(f"  {i}. Episode {result['id']}\n")
             f.write("\n")
-            
+
             # 计算各指标的平均值
-            f.write("="*60 + "\n")
             f.write("评估指标汇总:\n")
-            f.write("="*60 + "\n\n")
-            
+            f.write("-"*40 + "\n")
             metrics_to_average = ["distance_to_goal", "success", "spl", "path_length", "oracle_success"]
             for metric in metrics_to_average:
                 values = [r[metric] for r in all_results if metric in r]
                 if values:
                     avg_value = sum(values) / len(values)
                     f.write(f"{metric:20s}: {avg_value:.4f}\n")
-            
-            f.write("\n" + "="*60 + "\n")
-        
+            f.write("\n")
+
         print(f"新增评估 {len(new_evaluated_ids)} 个episode")
-        print(f"汇总报告已保存到: {summary_path}")
+        print(f"汇总报告已追加到: {summary_file} (第 {run_idx} 次评估)")
 
 
 
