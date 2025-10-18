@@ -63,7 +63,7 @@ def analyze_with_llm(instruction, config):
     }
     
     response = requests.post(
-        config['openrouter']['base_url'],
+        "https://openrouter.ai/api/v1/chat/completions",
         headers=headers,
         json=data,
         timeout=config['openrouter'].get('timeout', 30)
