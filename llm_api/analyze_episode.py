@@ -85,17 +85,20 @@ def analyze_with_llm(instruction, config):
 
 def main():
     parser = argparse.ArgumentParser(description='Episode Instruction分析工具')
-    parser.add_argument('--config', default='../VLN_CE/vlnce_baselines/config/r2r_baselines/navid_r2r.yaml',
+    parser.add_argument('--config', default='VLN_CE/vlnce_baselines/config/r2r_baselines/navid_r2r.yaml',
                        help='VLN-CE配置文件（相对于项目根目录的路径）')
     parser.add_argument('--episode-id', type=str, help='指定episode ID（不指定则随机选取）')
     parser.add_argument('--analyze', '-a', action='store_true', help='使用LLM分析')
     
     args = parser.parse_args()
     
-    # 构建完整的配置文件路径
+    # 切换到项目根目录（重要！）
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(script_dir)
-    config_file = os.path.join(project_root, args.config.lstrip('../'))
+    os.chdir(project_root)
+    
+    # 配置文件路径（现在已经在项目根目录了）
+    config_file = args.config
     
     # 加载数据集
     print("加载数据集...")
