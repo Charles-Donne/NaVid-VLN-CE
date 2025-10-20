@@ -5,9 +5,17 @@ Episode Instruction 分析工具 - 精简版
 """
 
 import argparse
+import os
+import sys
 import yaml
 import requests
 import random
+
+# 添加项目根目录到Python路径，以便导入VLN_CE模块
+script_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(script_dir)
+sys.path.insert(0, project_root)
+
 from habitat.datasets import make_dataset
 from VLN_CE.vlnce_baselines.config.default import get_config
 
@@ -33,8 +41,10 @@ USER_PROMPT_TEMPLATE = """请分析以下导航指令：
 
 
 def load_config():
-    """加载API配置"""
-    with open('api_config.yaml', 'r') as f:
+    """加载API配置（从当前脚本所在目录读取）"""
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    config_path = os.path.join(script_dir, 'api_config.yaml')
+    with open(config_path, 'r') as f:
         return yaml.safe_load(f)
 
 
@@ -75,16 +85,21 @@ def analyze_with_llm(instruction, config):
 
 def main():
     parser = argparse.ArgumentParser(description='Episode Instruction分析工具')
-    parser.add_argument('--config', default='VLN_CE/vlnce_baselines/config/r2r_baselines/navid_r2r.yaml',
-                       help='VLN-CE配置文件')
+    parser.add_argument('--config', default='../VLN_CE/vlnce_baselines/config/r2r_baselines/navid_r2r.yaml',
+                       help='VLN-CE配置文件（相对于项目根目录的路径）')
     parser.add_argument('--episode-id', type=str, help='指定episode ID（不指定则随机选取）')
     parser.add_argument('--analyze', '-a', action='store_true', help='使用LLM分析')
     
     args = parser.parse_args()
     
+    # 构建完整的配置文件路径
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(script_dir)
+    config_file = os.path.join(project_root, args.config.lstrip('../'))
+    
     # 加载数据集
     print("加载数据集...")
-    vln_config = get_config(args.config)
+    vln_config = get_config(config_file)
     dataset = make_dataset(
         id_dataset=vln_config.TASK_CONFIG.DATASET.TYPE,
         config=vln_config.TASK_CONFIG.DATASET

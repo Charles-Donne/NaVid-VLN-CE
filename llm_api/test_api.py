@@ -3,11 +3,15 @@
 LLM API连接测试程序
 """
 
+import os
 import yaml
 import requests
 
-# 加载配置
-with open('api_config.yaml', 'r') as f:
+# 加载配置（从当前脚本所在目录读取）
+script_dir = os.path.dirname(os.path.abspath(__file__))
+config_path = os.path.join(script_dir, 'api_config.yaml')
+
+with open(config_path, 'r') as f:
     config = yaml.safe_load(f)
 
 api_key = config['openrouter']['api_key']
