@@ -45,7 +45,7 @@ def load_config():
     # 获取项目根目录
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(script_dir)
-    config_path = os.path.join(project_root, 'llm_api', 'api_config.yaml')
+    config_path = os.path.join(project_root, 'NaVid-VLN-CE', 'llm_api', 'api_config.yaml')
     
     if not os.path.exists(config_path):
         raise FileNotFoundError(
