@@ -3,29 +3,25 @@ NaVid 智能体模块
 实现基于视频-语言模型的视觉语言导航智能体
 支持增量式视觉token复用，提高评估效率
 """
-import os
-import re
-import json
-import random
-from datetime import datetime
-from typing import Dict, List, Any, Optional
 
-import torch
-import cv2
+import json
+from datetime import datetime
 import numpy as np
-import imageio
-from tqdm import trange
 from habitat import Env
 from habitat.core.agent import Agent
+from tqdm import trange
+import os
+import re
+import torch
+import cv2
+import imageio
 from habitat.utils.visualizations import maps
+import random
 
 from navid.constants import IMAGE_TOKEN_INDEX, DEFAULT_IMAGE_TOKEN, DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN
 from navid.conversation import conv_templates, SeparatorStyle
 from navid.model.builder import load_pretrained_model
 from navid.mm_utils import tokenizer_image_token, get_model_name_from_path, KeywordsStoppingCriteria
-
-# 导入指令分解器
-from llm_api.instruction_decomposer import InstructionDecomposer
 
 
 def evaluate_agent(config, split_id, dataset, model_path, result_path) -> None:
@@ -192,7 +188,6 @@ class NaVid_Agent(Agent):
     - 历史视觉token复用（提高推理效率）
     - 增量式图像处理
     - 动作序列缓存
-    - 分层指令执行（instruction decomposition）
     """
     
     def __init__(self, model_path, result_path, require_map=True):
@@ -232,22 +227,12 @@ class NaVid_Agent(Agent):
         self.topdown_map_list = []
 
         self.count_id = 0
-        
-        # 🆕 初始化指令分解器
-        self.decomposer = InstructionDecomposer()
-        
         self.reset()
-    
+
+
     def run_episode(self, env, early_stop_rotation=20, early_stop_steps=500):
         """
-        执行一轮完整的episode评估循环（支持分层指令执行）
-        
-        流程:
-        1. 获取原始指令并分解为子指令序列
-        2. 外层循环：遍历每个子指令
-        3. 每个子指令开始前：重置视觉历史（rgb_list, history_rgb_tensor）
-        4. 内层循环：执行当前子指令直到模型输出stop
-        5. 继续执行下一个子指令
+        执行一轮完整的episode评估循环
         
         Args:
             env: Habitat环境对象
@@ -258,80 +243,40 @@ class NaVid_Agent(Agent):
             obs: 最后一步的观测
             iter_step: 总步数
         """
-        # 初始化环境并获取原始指令
-        obs = env.reset()
-        original_instruction = obs["instruction"]["text"]
+        # 连续旋转计数器（用于早停）
+        continuse_rotation_count = 0
+        last_dtg = 999
+        iter_step = 0
+        obs = None
         
-        # 【步骤1】分解指令为子指令序列
-        print(f"\n{'='*80}")
-        print(f"🎯 原始指令: {original_instruction}")
-        print(f"{'='*80}")
-        sub_instructions = self.decomposer.decompose(original_instruction)
-        
-        # 总步数计数器
-        total_iter_step = 0
-        
-        # 【步骤2】外层循环：遍历每个子指令
-        for sub_idx, sub_inst_dict in enumerate(sub_instructions, 1):
-            # 提取子指令文本（InstructionDecomposer 保证包含 'sub_instruction' 键）
-            sub_instruction = sub_inst_dict['sub_instruction']
+        while not env.episode_over:
+            info = env.get_metrics()
             
-            print(f"\n{'─'*80}")
-            print(f"📍 子任务 [{sub_idx}/{len(sub_instructions)}]: {sub_instruction}")
-            print(f"{'─'*80}")
+            # 检测是否持续原地旋转（通过距离变化判断）
+            if info["distance_to_goal"] != last_dtg:
+                last_dtg = info["distance_to_goal"]
+                continuse_rotation_count = 0
+            else:
+                continuse_rotation_count += 1 
             
-            # 【步骤3】重置视觉历史（每个子任务独立）
-            self.rgb_list = []
-            self.history_rgb_tensor = None
-            print("🔄 已重置视觉历史缓存")
+            # 获取智能体动作（使用当前观测obs）
+            action = self.act(obs if obs is not None else env.reset(), info, env.current_episode.episode_id)
             
-            # 【步骤4】内层循环：执行当前子指令直到stop
-            continuse_rotation_count = 0
-            last_dtg = 999
-            sub_iter_step = 0
-            
-            while True:
-                # 检查episode是否结束（整个任务终止条件）
-                if env.episode_over:
-                    print(f"\n🏁 Episode 结束（完成 {sub_idx}/{len(sub_instructions)} 个子任务，总步数 {total_iter_step}）")
-                    return obs, total_iter_step
-                
-                info = env.get_metrics()
-                
-                # 检测是否持续原地旋转
-                if info["distance_to_goal"] != last_dtg:
-                    last_dtg = info["distance_to_goal"]
-                    continuse_rotation_count = 0
-                else:
-                    continuse_rotation_count += 1
-                
-                # 获取智能体动作（传递子指令文本）
-                action = self.act(obs, info, env.current_episode.episode_id, sub_instruction=sub_instruction)
-                
-                # 早停条件：过多旋转或超过最大步数
-                if continuse_rotation_count > early_stop_rotation or total_iter_step > early_stop_steps:
-                    print(f"⚠️  触发早停条件（旋转:{continuse_rotation_count}, 总步数:{total_iter_step}）")
-                    action = {"action": 0}  # 强制停止
-                    env.step(action)
-                    return obs, total_iter_step
-                
-                sub_iter_step += 1
-                total_iter_step += 1
-                
-                # 执行动作并获取新观测
-                obs = env.step(action)
-                
-                # 检查是否为stop动作（子任务完成，静默进入下一个子任务）
-                if action["action"] == 0:
-                    # 如果是最后一个子任务，stop动作会触发episode_over
-                    # 如果不是最后一个子任务，继续执行下一个
-                    break  # 退出内层循环，继续下一个子指令
+            # 早停条件：过多旋转或超过最大步数
+            if continuse_rotation_count > early_stop_rotation or iter_step > early_stop_steps:
+                action = {"action": 0}  # 强制停止动作
+
+            iter_step += 1
+            # 同步执行动作并等待完成，返回新观测
+            # env.step()内部流程：
+            # 1. 执行动作（前进/转向/停止）
+            # 2. 等待物理模拟完成
+            # 3. 更新机器人位置和朝向
+            # 4. 从新位置渲染RGB图像、深度图等传感器数据
+            # 5. 返回新的observation字典（包含rgb、instruction等）
+            obs = env.step(action)  # 阻塞调用，确保动作完成后才继续
         
-        print(f"\n{'='*80}")
-        print(f"🏁 所有子任务完成！总步数: {total_iter_step}")
-        print(f"{'='*80}\n")
-        
-        return obs, total_iter_step
+        return obs, iter_step
 
 
     def process_images(self, rgb_list):
@@ -568,7 +513,7 @@ class NaVid_Agent(Agent):
         self.pending_action_list = []
 
 
-    def act(self, observations, info, episode_id, sub_instruction=None):
+    def act(self, observations, info, episode_id):
         """
         执行单步动作决策
         
@@ -582,7 +527,6 @@ class NaVid_Agent(Agent):
                       每个episode在数据集中预先定义了instruction_text
             info: 环境信息（包含distance_to_goal等指标）
             episode_id: 当前episode ID
-            sub_instruction: 可选的子指令文本，如果提供则替换 observations["instruction"]["text"]
             
         Returns:
             动作字典 {"action": action_id}
@@ -590,9 +534,6 @@ class NaVid_Agent(Agent):
         self.episode_id = episode_id
         rgb = observations["rgb"]
         self.rgb_list.append(rgb)
-        
-        # 确定使用的指令文本（子指令优先，否则使用原始指令）
-        instruction_text = sub_instruction if sub_instruction is not None else observations["instruction"]["text"]
 
         # 生成可视化地图
         if self.require_map:
@@ -607,14 +548,14 @@ class NaVid_Agent(Agent):
             
             if self.require_map:
                 img = self.addtext(output_im, observations["instruction"]["text"], 
-                                   "Pending action: {}".format(temp_action))
+                                  "Pending action: {}".format(temp_action))
                 self.topdown_map_list.append(img)
             
             return {"action": temp_action}  # 直接返回缓存动作，跳过模型推理
 
         # 【模型推理】缓存为空时，才调用耗时的VLM生成新决策
         # 1. 构建完整的提示词
-        navigation_qs = self.promt_template.format(instruction_text)
+        navigation_qs = self.promt_template.format(observations["instruction"]["text"])
         
         # 2. 调用VLM模型进行推理（耗时操作）
         navigation = self.predict_inference(navigation_qs)  # GPU推理，约2-3秒
@@ -623,9 +564,9 @@ class NaVid_Agent(Agent):
         if self.require_map:
             # 将instruction和模型输出的决策都标注在图像上
             # 例如图像底部显示：
-            #   "Walk to the kitchen..."  (任务指令/子指令)
+            #   "Walk to the kitchen..."  (任务指令)
             #   "turn left 60 degrees"    (模型决策)
-            img = self.addtext(output_im, instruction_text, navigation)
+            img = self.addtext(output_im, observations["instruction"]["text"], navigation)
             self.topdown_map_list.append(img)  # 添加到视频帧列表
 
         # 解析动作
