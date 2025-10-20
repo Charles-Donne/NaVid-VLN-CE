@@ -104,7 +104,7 @@ def evaluate_agent(config, split_id, dataset, model_path, result_path) -> None:
         agent.reset()
         
         # 执行一轮完整的episode评估（封装在agent类中）
-        obs, iter_step = agent.run_episode(env, EARLY_STOP_ROTATION, EARLY_STOP_STEPS)
+        iter_step = agent.run_episode(env, EARLY_STOP_ROTATION, EARLY_STOP_STEPS)
             
         # 收集本次episode的评估指标（如距离目标、成功率等）
         info = env.get_metrics()
@@ -276,7 +276,7 @@ class NaVid_Agent(Agent):
             # 5. 返回新的observation字典（包含rgb、instruction等）
             obs = env.step(action)  # 阻塞调用，确保动作完成后才继续
         
-        return obs, iter_step
+        return iter_step
 
 
     def process_images(self, rgb_list):

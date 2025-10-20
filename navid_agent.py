@@ -108,7 +108,7 @@ def evaluate_agent(config, split_id, dataset, model_path, result_path) -> None:
         agent.reset()
         
         # 执行一轮完整的episode评估（封装在agent类中）
-        obs, iter_step = agent.run_episode(env, EARLY_STOP_ROTATION, EARLY_STOP_STEPS)
+        iter_step = agent.run_episode(env, EARLY_STOP_ROTATION, EARLY_STOP_STEPS)
             
         # 收集本次episode的评估指标（如距离目标、成功率等）
         info = env.get_metrics()
@@ -270,6 +270,8 @@ class NaVid_Agent(Agent):
         
         # 总步数计数器
         total_iter_step = 0
+        continuse_rotation_count = 0
+        last_dtg = 999
         
         # 【步骤2】外层循环：遍历每个子指令
         for sub_idx, sub_inst_dict in enumerate(sub_instructions, 1):
@@ -283,18 +285,15 @@ class NaVid_Agent(Agent):
             # 【步骤3】重置视觉历史（每个子任务独立）
             self.rgb_list = []
             self.history_rgb_tensor = None
-            print("🔄 已重置视觉历史缓存")
             
             # 【步骤4】内层循环：执行当前子指令直到stop
-            continuse_rotation_count = 0
-            last_dtg = 999
             sub_iter_step = 0
             
             while True:
                 # 检查episode是否结束（整个任务终止条件）
                 if env.episode_over:
                     print(f"\n🏁 Episode 结束（完成 {sub_idx}/{len(sub_instructions)} 个子任务，总步数 {total_iter_step}）")
-                    return obs, total_iter_step
+                    return total_iter_step
                 
                 info = env.get_metrics()
                 
@@ -313,25 +312,23 @@ class NaVid_Agent(Agent):
                     print(f"⚠️  触发早停条件（旋转:{continuse_rotation_count}, 总步数:{total_iter_step}）")
                     action = {"action": 0}  # 强制停止
                     env.step(action)
-                    return obs, total_iter_step
+                    return total_iter_step
                 
                 sub_iter_step += 1
                 total_iter_step += 1
                 
-                # 执行动作并获取新观测
-                obs = env.step(action)
-                
                 # 检查是否为stop动作（子任务完成，静默进入下一个子任务）
                 if action["action"] == 0:
-                    # 如果是最后一个子任务，stop动作会触发episode_over
-                    # 如果不是最后一个子任务，继续执行下一个
+
                     break  # 退出内层循环，继续下一个子指令
-        
-        print(f"\n{'='*80}")
-        print(f"🏁 所有子任务完成！总步数: {total_iter_step}")
-        print(f"{'='*80}\n")
-        
-        return obs, total_iter_step
+                # 执行动作并获取新观测
+
+                obs = env.step(action)
+                
+
+        obs = env.step(action)
+
+        return total_iter_step
 
 
     def process_images(self, rgb_list):
