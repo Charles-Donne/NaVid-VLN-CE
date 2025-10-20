@@ -99,40 +99,12 @@ def evaluate_agent(config, split_id, dataset, model_path, result_path) -> None:
             print(f"已达到最大episode数 ({max_episodes})，提前结束评估")
             break
             
-        obs = env.reset()
-        iter_step = 0
+        # 重置环境和智能体
+        env.reset()
         agent.reset()
-
-        # 连续旋转计数器（用于早停）
-        continuse_rotation_count = 0
-        last_dtg = 999
         
-        while not env.episode_over:
-            info = env.get_metrics()
-            
-            # 检测是否持续原地旋转（通过距离变化判断）
-            if info["distance_to_goal"] != last_dtg:
-                last_dtg = info["distance_to_goal"]
-                continuse_rotation_count = 0
-            else:
-                continuse_rotation_count += 1 
-            
-            # 获取智能体动作（使用当前观测obs）
-            action = agent.act(obs, info, env.current_episode.episode_id)
-            
-            # 早停条件：过多旋转或超过最大步数
-            if continuse_rotation_count > EARLY_STOP_ROTATION or iter_step > EARLY_STOP_STEPS:
-                action = {"action": 0}  # 强制停止动作
-
-            iter_step += 1
-            # 同步执行动作并等待完成，返回新观测
-            # env.step()内部流程：
-            # 1. 执行动作（前进/转向/停止）
-            # 2. 等待物理模拟完成
-            # 3. 更新机器人位置和朝向
-            # 4. 从新位置渲染RGB图像、深度图等传感器数据
-            # 5. 返回新的observation字典（包含rgb、instruction等）
-            obs = env.step(action)  # 阻塞调用，确保动作完成后才继续
+        # 执行一轮完整的episode评估（封装在agent类中）
+        obs, iter_step = agent.run_episode(env, EARLY_STOP_ROTATION, EARLY_STOP_STEPS)
             
         # 收集本次episode的评估指标（如距离目标、成功率等）
         info = env.get_metrics()
@@ -257,6 +229,54 @@ class NaVid_Agent(Agent):
         self.count_id = 0
         self.reset()
 
+
+    def run_episode(self, env, early_stop_rotation=20, early_stop_steps=500):
+        """
+        执行一轮完整的episode评估循环
+        
+        Args:
+            env: Habitat环境对象
+            early_stop_rotation: 最大连续旋转次数（早停阈值）
+            early_stop_steps: 最大步数（早停阈值）
+            
+        Returns:
+            obs: 最后一步的观测
+            iter_step: 总步数
+        """
+        # 连续旋转计数器（用于早停）
+        continuse_rotation_count = 0
+        last_dtg = 999
+        iter_step = 0
+        obs = None
+        
+        while not env.episode_over:
+            info = env.get_metrics()
+            
+            # 检测是否持续原地旋转（通过距离变化判断）
+            if info["distance_to_goal"] != last_dtg:
+                last_dtg = info["distance_to_goal"]
+                continuse_rotation_count = 0
+            else:
+                continuse_rotation_count += 1 
+            
+            # 获取智能体动作（使用当前观测obs）
+            action = self.act(obs if obs is not None else env.reset(), info, env.current_episode.episode_id)
+            
+            # 早停条件：过多旋转或超过最大步数
+            if continuse_rotation_count > early_stop_rotation or iter_step > early_stop_steps:
+                action = {"action": 0}  # 强制停止动作
+
+            iter_step += 1
+            # 同步执行动作并等待完成，返回新观测
+            # env.step()内部流程：
+            # 1. 执行动作（前进/转向/停止）
+            # 2. 等待物理模拟完成
+            # 3. 更新机器人位置和朝向
+            # 4. 从新位置渲染RGB图像、深度图等传感器数据
+            # 5. 返回新的observation字典（包含rgb、instruction等）
+            obs = env.step(action)  # 阻塞调用，确保动作完成后才继续
+        
+        return obs, iter_step
 
 
     def process_images(self, rgb_list):
