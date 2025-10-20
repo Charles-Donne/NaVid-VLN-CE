@@ -41,9 +41,18 @@ USER_PROMPT_TEMPLATE = """请分析以下导航指令：
 
 
 def load_config():
-    """加载API配置（从当前脚本所在目录读取）"""
+    """加载API配置（从llm_api/api_config.yaml读取）"""
+    # 获取项目根目录
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    config_path = os.path.join(script_dir, 'api_config.yaml')
+    project_root = os.path.dirname(script_dir)
+    config_path = os.path.join(project_root, 'llm_api', 'api_config.yaml')
+    
+    if not os.path.exists(config_path):
+        raise FileNotFoundError(
+            f"找不到配置文件: {config_path}\n"
+            f"请在 llm_api/ 目录创建 api_config.yaml 文件"
+        )
+    
     with open(config_path, 'r') as f:
         return yaml.safe_load(f)
 
