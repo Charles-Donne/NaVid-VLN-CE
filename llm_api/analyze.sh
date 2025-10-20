@@ -26,4 +26,4 @@ if [[ "$1" == "-a" ]] || [[ "$2" == "-a" ]]; then
 fi
 
 # 运行
-python analyze_episode.py $EPISODE_ID $ANALYZE
+python3 analyze_episode.py $EPISODE_ID $ANALYZE

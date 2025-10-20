@@ -15,4 +15,4 @@ if [[ "$1" == "-h" ]] || [[ "$1" == "--help" ]]; then
 fi
 
 # 运行Python脚本
-python decompose_instruction.py "$@"
+python3 decompose_instruction.py "$@"
